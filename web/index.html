@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Calmii</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Calmii">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#6FAEDB" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141B36" media="(prefers-color-scheme: dark)">
 <style>
   :root {
     --bg: #6FAEDB;
@@ -59,18 +67,18 @@
   @keyframes drift { to { transform: translate(8vmax, -6vmax) scale(1.1); } }
 
   #app { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; max-width: 560px; margin: 0 auto; }
-  header.top { display: flex; align-items: baseline; justify-content: space-between; padding: 18px 22px 6px; }
+  header.top { display: flex; align-items: baseline; justify-content: space-between; padding: max(18px, env(safe-area-inset-top)) 22px 6px; }
   .in-app header.top { padding-top: 34px; }
   .brand { font-weight: 700; font-size: 22px; letter-spacing: .5px; }
   .greet { font-size: 14px; color: var(--ink-soft); }
 
   main { flex: 1; position: relative; overflow: hidden; }
-  .view { position: absolute; inset: 0; overflow-y: auto; padding: 8px 18px 110px; opacity: 0; pointer-events: none; transition: opacity .45s ease; }
+  .view { position: absolute; inset: 0; overflow-y: auto; padding: 8px 18px calc(110px + env(safe-area-inset-bottom)); opacity: 0; pointer-events: none; transition: opacity .45s ease; }
   .view.active { opacity: 1; pointer-events: auto; }
   .view::-webkit-scrollbar { width: 0; }
 
   nav.tabs {
-    position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+    position: absolute; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%);
     display: flex; gap: 4px; padding: 6px; border-radius: 999px;
     background: var(--card-hi); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
     box-shadow: var(--shadow); z-index: 5;
@@ -243,7 +251,7 @@
 
     <!-- PLAY -->
     <section id="play" class="view">
-      <canvas id="pond"></canvas>
+      <canvas id="pond" style="touch-action: none"></canvas>
       <div class="play-top">
         <span id="letGo">tap the bubbles · let thoughts drift away</span>
         <button class="pill" id="soundBtn">sound on</button>
@@ -941,6 +949,9 @@
 
   // native app can ask us to jump somewhere
   window.calmiiGo = v => { closeSheet(); show(v); if (v === 'breathe' && !breathing) toggleBreath(); };
+
+  // phone / web install: cache everything so it opens offline (skipped inside the Mac app's file:// page)
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 
   const startTab = params.get('tab') || 'breathe';
   show(['breathe', 'calm', 'play', 'escape'].includes(startTab) ? startTab : 'breathe');
