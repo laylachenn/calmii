@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calmii</title>
+<style>
+  :root {
+    --bg: #6FAEDB;
+    --bg2: #86BEE4;
+    --ink: #17264A;
+    --ink-soft: #2E416B;
+    --card: rgba(255,255,255,.52);
+    --card-hi: rgba(255,255,255,.72);
+    --line: rgba(23,38,74,.12);
+    --magenta: #CF4DBE;
+    --orange: #F3AE47;
+    --cyan: #7FF5EC;
+    --accent: #B83FA8;
+    --orb-fade: rgba(111,174,219,0);
+    --shadow: 0 10px 30px rgba(23,38,74,.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141B36;
+      --bg2: #1C2650;
+      --ink: #EEF2FF;
+      --ink-soft: #B9C3E6;
+      --card: rgba(255,255,255,.07);
+      --card-hi: rgba(255,255,255,.12);
+      --line: rgba(255,255,255,.1);
+      --accent: #F08BE3;
+      --orb-fade: rgba(20,27,54,0);
+      --shadow: 0 10px 30px rgba(0,0,0,.3);
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+    color: var(--ink);
+    background: radial-gradient(120% 80% at 50% 0%, var(--bg2), var(--bg) 70%);
+    background-color: var(--bg);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, textarea { font: inherit; color: inherit; }
+  a { color: var(--accent); }
+
+  /* ambient drifting auras */
+  .ambient { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+  .ambient span {
+    position: absolute; width: 60vmax; height: 60vmax; border-radius: 50%;
+    filter: blur(60px); opacity: .28;
+    animation: drift 38s ease-in-out infinite alternate;
+  }
+  .ambient span:nth-child(1) { background: var(--magenta); left: -25vmax; top: 55%; }
+  .ambient span:nth-child(2) { background: var(--cyan); right: -30vmax; top: -20vmax; animation-duration: 46s; opacity: .22; }
+  @keyframes drift { to { transform: translate(8vmax, -6vmax) scale(1.1); } }
+
+  #app { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; max-width: 560px; margin: 0 auto; }
+  header.top { display: flex; align-items: baseline; justify-content: space-between; padding: 18px 22px 6px; }
+  .in-app header.top { padding-top: 34px; }
+  .brand { font-weight: 700; font-size: 22px; letter-spacing: .5px; }
+  .greet { font-size: 14px; color: var(--ink-soft); }
+
+  main { flex: 1; position: relative; overflow: hidden; }
+  .view { position: absolute; inset: 0; overflow-y: auto; padding: 8px 18px 110px; opacity: 0; pointer-events: none; transition: opacity .45s ease; }
+  .view.active { opacity: 1; pointer-events: auto; }
+  .view::-webkit-scrollbar { width: 0; }
+
+  nav.tabs {
+    position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+    display: flex; gap: 4px; padding: 6px; border-radius: 999px;
+    background: var(--card-hi); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    box-shadow: var(--shadow); z-index: 5;
+  }
+  nav.tabs button {
+    border: 0; background: transparent; padding: 10px 16px; border-radius: 999px; cursor: pointer;
+    font-size: 15px; color: var(--ink-soft); transition: background .3s, color .3s;
+  }
+  nav.tabs button.on { background: var(--ink); color: var(--bg); }
+
+  /* ---------- breathe ---------- */
+  .breathe-wrap { display: flex; flex-direction: column; align-items: center; min-height: 100%; }
+  .orb-stage { position: relative; width: min(84vw, 380px); aspect-ratio: 1; display: grid; place-items: center; margin-top: 4px; cursor: pointer; }
+  .orb {
+    position: absolute; inset: 0; border-radius: 50%;
+    background: radial-gradient(circle,
+      var(--magenta) 0%, #D35AB2 17%, #EE9A55 33%, var(--orange) 41%,
+      #C9E7A6 52%, var(--cyan) 60%, rgba(127,245,236,.55) 66%, var(--orb-fade) 74%);
+    filter: blur(7px) saturate(1.05);
+    transform: scale(.66);
+    will-change: transform;
+  }
+  .orb.idle { animation: idle 9s ease-in-out infinite; }
+  @keyframes idle { 0%,100% { transform: scale(.64); } 50% { transform: scale(.72); } }
+  .orb-label { position: relative; text-align: center; pointer-events: none; color: #fff; text-shadow: 0 1px 12px rgba(120,20,110,.45); }
+  .orb-label .phase { font-size: 26px; font-weight: 600; letter-spacing: .3px; }
+  .orb-label .count { font-size: 15px; opacity: .9; margin-top: 2px; min-height: 18px; }
+
+  .patterns { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 6px 0 14px; }
+  .pill {
+    border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 8px 14px;
+    cursor: pointer; font-size: 14px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    transition: background .25s, transform .15s;
+  }
+  .pill:active { transform: scale(.96); }
+  .pill.on { background: var(--ink); color: var(--bg); border-color: transparent; }
+  .hint { font-size: 13px; color: var(--ink-soft); text-align: center; margin: 0 0 18px; max-width: 340px; line-height: 1.45; }
+  .section-title { font-size: 13px; text-transform: lowercase; letter-spacing: .6px; color: var(--ink-soft); margin: 18px 4px 10px; font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+
+  /* ---------- cards ---------- */
+  .card {
+    display: block; width: 100%; text-align: left; border: 1px solid var(--line); cursor: pointer;
+    background: var(--card); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-radius: 20px; padding: 14px 16px; margin-bottom: 10px; transition: transform .15s, background .25s;
+  }
+  .card:hover { background: var(--card-hi); }
+  .card:active { transform: scale(.985); }
+  .card .t { font-weight: 600; font-size: 16px; }
+  .card .s { font-size: 13.5px; color: var(--ink-soft); margin-top: 3px; line-height: 1.4; }
+  .footnote { font-size: 12.5px; color: var(--ink-soft); line-height: 1.5; padding: 8px 6px 0; }
+
+  /* ---------- sheet ---------- */
+  .sheet-back { position: fixed; inset: 0; background: rgba(10,16,40,.35); opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 20; }
+  .sheet-back.open { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: fixed; left: 50%; bottom: 0; width: min(560px, 100%); max-height: 88%; overflow-y: auto;
+    transform: translate(-50%, 104%); transition: transform .42s cubic-bezier(.2,.8,.2,1);
+    background: var(--bg); background-image: radial-gradient(90% 50% at 50% 0%, var(--bg2), transparent);
+    border-radius: 26px 26px 0 0; padding: 22px 22px 40px; z-index: 21; box-shadow: 0 -10px 40px rgba(0,0,0,.2);
+  }
+  .sheet.open { transform: translate(-50%, 0); }
+  .sheet h2 { margin: 0 34px 4px 0; font-size: 22px; }
+  .sheet .lede { color: var(--ink-soft); margin: 0 0 14px; font-size: 14.5px; line-height: 1.5; }
+  .sheet p, .sheet li { font-size: 15px; line-height: 1.6; }
+  .sheet ol, .sheet ul { padding-left: 20px; }
+  .sheet li { margin-bottom: 6px; }
+  .sheet .close { position: absolute; top: 16px; right: 16px; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--card-hi); cursor: pointer; font-size: 18px; }
+  .say { background: var(--card-hi); border-radius: 16px; padding: 12px 14px; margin: 12px 0; font-size: 15.5px; line-height: 1.5; border-left: 4px solid var(--magenta); }
+  .src { font-size: 12.5px; color: var(--ink-soft); margin-top: 16px; }
+  .btn { border: 0; background: var(--ink); color: var(--bg); border-radius: 999px; padding: 10px 16px; cursor: pointer; font-size: 14.5px; }
+  .btn.ghost { background: var(--card-hi); color: var(--ink); }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .field { flex: 1; border: 1px solid var(--line); background: var(--card-hi); border-radius: 14px; padding: 10px 12px; outline: none; min-width: 0; }
+  .field:focus { border-color: var(--accent); }
+  .worry-list { list-style: none; padding: 0 !important; margin: 10px 0; }
+  .worry-list li { background: var(--card); border-radius: 12px; padding: 8px 12px; display: flex; justify-content: space-between; gap: 8px; font-size: 14.5px; }
+  .worry-list li button { border: 0; background: none; cursor: pointer; color: var(--ink-soft); }
+  .timer { font-variant-numeric: tabular-nums; font-size: 34px; font-weight: 600; text-align: center; margin: 8px 0; }
+
+  /* ---------- play ---------- */
+  #play { padding: 0; overflow: hidden; }
+  #pond { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; touch-action: none; }
+  .play-ui { position: absolute; left: 18px; right: 18px; bottom: 92px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .play-ui > * { pointer-events: auto; }
+  .play-top { position: absolute; top: 6px; left: 18px; right: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 13.5px; color: var(--ink-soft); pointer-events: none; }
+  .play-top button { pointer-events: auto; }
+
+  /* ---------- escape ---------- */
+  .big-links { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 6px; }
+  .big {
+    display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; text-decoration: none; color: #fff;
+    min-height: 140px; border-radius: 24px; padding: 16px; box-shadow: var(--shadow); position: relative; overflow: hidden;
+    transition: transform .15s;
+  }
+  .big:active { transform: scale(.97); }
+  .big b { font-size: 21px; }
+  .big small { font-size: 13px; opacity: .92; }
+  .big.yt { background: radial-gradient(circle at 80% 15%, #FFB36B 0%, #F0525C 45%, #C3307A 100%); }
+  .big.tw { background: radial-gradient(circle at 80% 15%, #7FF5EC 0%, #8A6BF2 45%, #5B3CC4 100%); }
+  .picks { display: flex; flex-wrap: wrap; gap: 8px; }
+  .picks a { text-decoration: none; color: var(--ink); }
+  .fav-list .card { display: flex; justify-content: space-between; align-items: center; text-decoration: none; color: var(--ink); }
+  .fav-list .x { border: 0; background: none; cursor: pointer; color: var(--ink-soft); font-size: 16px; padding: 4px 8px; }
+
+  /* ---------- sounds ---------- */
+  .sound-row { display: flex; align-items: center; gap: 6px; justify-content: center; flex-wrap: wrap; margin: -6px 0 16px; font-size: 13px; color: var(--ink-soft); }
+  .pill.sm { padding: 6px 12px; font-size: 13px; }
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .tile {
+    border: 1px solid var(--line); background: var(--card); border-radius: 20px; padding: 14px 8px 12px; cursor: pointer; text-align: center;
+    font-size: 14px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transition: background .25s, border-color .25s, transform .15s;
+  }
+  .tile:active { transform: scale(.96); }
+  .tile .dot {
+    width: 38px; height: 38px; border-radius: 50%; margin: 0 auto 8px; opacity: .5; transform: scale(.8); transition: opacity .4s, transform .4s;
+    background: radial-gradient(circle, var(--magenta) 0%, var(--orange) 40%, var(--cyan) 65%, rgba(127,245,236,0) 72%);
+  }
+  .tile.on { background: var(--card-hi); border-color: var(--accent); }
+  .tile.on .dot { opacity: 1; animation: pulse 4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { transform: scale(.85); } 50% { transform: scale(1.05); } }
+  .vol { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 13px; color: var(--ink-soft); }
+  .vol input[type=range] { flex: 1; accent-color: var(--accent); }
+
+  /* ---------- widget mode ---------- */
+  body.widget { background: transparent !important; }
+  body.widget #app, body.widget .ambient { display: none; }
+  #widget { display: none; }
+  body.widget #widget { display: grid; place-items: center; position: fixed; inset: 0; }
+  #widget .orb { animation: wbreathe 10s ease-in-out infinite; }
+  @keyframes wbreathe { 0% { transform: scale(.62); } 40% { transform: scale(.98); } 100% { transform: scale(.62); } }
+  #widget .orb-label .phase { font-size: 15px; }
+
+  @media (prefers-reduced-motion: reduce) { .ambient span { animation: none; } }
+</style>
+</head>
+<body>
+<div class="ambient"><span></span><span></span></div>
+
+<div id="app">
+  <header class="top">
+    <span class="brand">calmii</span>
+    <span class="greet" id="greet"></span>
+  </header>
+
+  <main>
+    <!-- BREATHE -->
+    <section id="breathe" class="view active">
+      <div class="breathe-wrap">
+        <div class="orb-stage" id="orbStage" title="tap to start or pause">
+          <div class="orb idle" id="orb"></div>
+          <div class="orb-label"><div class="phase" id="phase">tap to breathe</div><div class="count" id="count"></div></div>
+        </div>
+        <div class="patterns" id="patterns"></div>
+        <p class="hint" id="patternHint"></p>
+        <div class="sound-row" id="breathSounds"></div>
+
+        <div class="section-title">what's going on?</div>
+        <div class="chips" id="chips"></div>
+      </div>
+    </section>
+
+    <!-- TOOLKIT -->
+    <section id="calm" class="view">
+      <div id="toolkit"></div>
+      <p class="footnote">
+        If you feel unsafe or in crisis, please reach a real person right now: call or text <b>988</b> (US), or find a free line in your country at <a href="https://findahelpline.com" target="_blank">findahelpline.com</a>.
+      </p>
+    </section>
+
+    <!-- PLAY -->
+    <section id="play" class="view">
+      <canvas id="pond"></canvas>
+      <div class="play-top">
+        <span id="letGo">tap the bubbles · let thoughts drift away</span>
+        <button class="pill" id="soundBtn">sound on</button>
+      </div>
+      <div class="play-ui">
+        <form class="row" id="floatForm">
+          <input class="field" id="floatInput" maxlength="60" placeholder="type a thought, let it float…" autocomplete="off">
+          <button class="btn" type="submit">release</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ESCAPE -->
+    <section id="escape" class="view">
+      <div class="big-links">
+        <a class="big yt" href="https://www.youtube.com" target="_blank"><b>YouTube</b><small>get cozy</small></a>
+        <a class="big tw" href="https://www.twitch.tv" target="_blank"><b>Twitch</b><small>hang out with a stream</small></a>
+      </div>
+
+      <div class="section-title">listen here</div>
+      <div class="tiles" id="tiles"></div>
+      <div class="vol">
+        <span>quiet</span><input type="range" id="vol" min="0" max="1" step="0.01"><span>loud</span>
+        <button class="pill sm" id="stopAll">stop all</button>
+      </div>
+
+      <div class="section-title">quick picks</div>
+      <div class="picks" id="picks"></div>
+
+      <div class="section-title">my favorites</div>
+      <div class="fav-list" id="favList"></div>
+      <form class="row" id="favForm" style="margin-top:4px">
+        <input class="field" id="favName" placeholder="name" style="flex:.8">
+        <input class="field" id="favUrl" placeholder="link (channel, streamer…)">
+        <button class="btn" type="submit">add</button>
+      </form>
+      <p class="footnote">Comfort-watching is a real way to calm down. If you notice you're using it to avoid something for hours at a time, try a check-in from the calm tab afterward.</p>
+    </section>
+  </main>
+
+  <nav class="tabs" id="tabs">
+    <button data-v="breathe" class="on">breathe</button>
+    <button data-v="calm">calm</button>
+    <button data-v="play">play</button>
+    <button data-v="escape">escape</button>
+  </nav>
+</div>
+
+<div class="sheet-back" id="sheetBack"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true">
+  <button class="close" id="sheetClose" aria-label="close">×</button>
+  <div id="sheetBody"></div>
+</div>
+
+<!-- desktop widget mode -->
+<div id="widget">
+  <div class="orb-stage" style="width:170px">
+    <div class="orb"></div>
+    <div class="orb-label"><div class="phase" id="wphase">breathe in</div></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const params = new URLSearchParams(location.search);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('calmii.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('calmii.' + k, JSON.stringify(v)); } catch {} }
+  };
+  const native = msg => { try { window.webkit.messageHandlers.calmii.postMessage(msg); return true; } catch { return false; } };
+
+  /* ---------------- widget mode ---------------- */
+  if (params.has('widget')) {
+    document.body.classList.add('widget');
+    const p = $('#wphase');
+    const tick = () => { p.textContent = 'breathe in'; setTimeout(() => p.textContent = 'and out', 4000); };
+    tick(); setInterval(tick, 10000);
+    return;
+  }
+  if (params.has('app')) document.body.classList.add('in-app');
+
+  /* ---------------- greeting ---------------- */
+  const h = new Date().getHours();
+  $('#greet').textContent =
+    h < 5 ? "it's late. go gently." : h < 12 ? 'good morning' : h < 17 ? 'good afternoon' : h < 22 ? 'good evening' : 'winding down';
+
+  /* ---------------- tabs ---------------- */
+  let current = 'breathe';
+  function show(v) {
+    current = v;
+    document.querySelectorAll('.view').forEach(el => el.classList.toggle('active', el.id === v));
+    document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+    if (v === 'play') startPond(); else stopPond();
+    if (v !== 'breathe' && breathing) toggleBreath();
+    store.set('tab', v);
+  }
+  $('#tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) show(b.dataset.v); });
+
+  /* ---------------- sound engine (all generated live, works offline) ---------------- */
+  const Sound = (() => {
+    let ctx = null, master = null, irBuf = null;
+    const bufs = {}, active = {}, listeners = [];
+    let vol = store.get('volume', 0.6);
+
+    function init() {
+      if (!ctx) {
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
+        master = ctx.createGain(); master.gain.value = vol; master.connect(ctx.destination);
+      }
+      if (ctx.state === 'suspended') ctx.resume();
+      return ctx;
+    }
+    function noise(kind) {
+      if (bufs[kind]) return bufs[kind];
+      const len = ctx.sampleRate * 8, b = ctx.createBuffer(1, len, ctx.sampleRate), d = b.getChannelData(0);
+      let b0 = 0, b1 = 0, b2 = 0, last = 0;
+      for (let i = 0; i < len; i++) {
+        const w = Math.random() * 2 - 1;
+        if (kind === 'white') d[i] = w;
+        else if (kind === 'pink') { b0 = .99765 * b0 + w * .099046; b1 = .963 * b1 + w * .2965164; b2 = .57 * b2 + w * 1.0526913; d[i] = (b0 + b1 + b2 + w * .1848) * .2; }
+        else { last = (last + .02 * w) / 1.02; d[i] = last * 3.5; }
+      }
+      // smooth the loop seam
+      const f = 2000; for (let i = 0; i < f; i++) { const k = i / f; d[i] = d[i] * k + d[len - f + i] * (1 - k); }
+      return (bufs[kind] = b);
+    }
+    function impulse() {
+      if (irBuf) return irBuf;
+      const len = ctx.sampleRate * 3.5; irBuf = ctx.createBuffer(2, len, ctx.sampleRate);
+      for (let c = 0; c < 2; c++) { const d = irBuf.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6); }
+      return irBuf;
+    }
+    function loop(kind, nodes) { const s = ctx.createBufferSource(); s.buffer = noise(kind); s.loop = true; s.start(0, Math.random() * 7); nodes.push(s); return s; }
+    function filt(type, freq, q = .7) { const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q; return f; }
+    function gain(v) { const g = ctx.createGain(); g.gain.value = v; return g; }
+    function lfo(rate, depth, target, nodes) { const o = ctx.createOscillator(); o.frequency.value = rate; const g = gain(depth); o.connect(g).connect(target); o.start(); nodes.push(o); }
+    function burst(dest, dur, peak, type, freq, q) {
+      const s = ctx.createBufferSource(); s.buffer = noise('white');
+      const f = filt(type, freq, q), g = gain(0), t = ctx.currentTime;
+      g.gain.setValueAtTime(peak, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+      s.connect(f).connect(g).connect(dest); s.start(t, Math.random() * 7); s.stop(t + dur + .05);
+    }
+
+    const makers = {
+      music(out, nodes, alive) {
+        const lp = filt('lowpass', 900, .4), dry = gain(.55), wet = gain(.9), verb = ctx.createConvolver();
+        verb.buffer = impulse(); lp.connect(dry).connect(out); lp.connect(wet).connect(verb).connect(out);
+        const chords = [
+          [130.81, 196.00, 246.94, 329.63],   // Cmaj7
+          [110.00, 164.81, 246.94, 261.63],   // Am(add9)
+          [87.31, 174.61, 220.00, 329.63],    // Fmaj7
+          [98.00, 146.83, 220.00, 293.66],    // G sus
+        ];
+        let next = ctx.currentTime + .1, idx = 0;
+        const chord = (fs, t) => fs.forEach(f => [['sine', 1, .05], ['triangle', 1.004, .018]].forEach(([type, det, pk]) => {
+          const o = ctx.createOscillator(), g = gain(0); o.type = type; o.frequency.value = f * det;
+          g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(pk, t + 3.5);
+          g.gain.setValueAtTime(pk, t + 8); g.gain.linearRampToValueAtTime(0, t + 12.5);
+          o.connect(g).connect(lp); o.start(t); o.stop(t + 13);
+        }));
+        const sched = () => { while (next < ctx.currentTime + 1.5) { chord(chords[idx++ % chords.length], next); next += 9; } };
+        sched(); const iv = setInterval(sched, 500);
+        const bells = [523.25, 587.33, 659.25, 783.99, 880, 1046.5];
+        const bell = () => {
+          if (!alive()) return;
+          const o = ctx.createOscillator(), g = gain(0), t = ctx.currentTime; o.type = 'sine';
+          o.frequency.value = bells[Math.random() * bells.length | 0];
+          g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.03, t + .02); g.gain.exponentialRampToValueAtTime(.0001, t + 4);
+          o.connect(g); g.connect(wet); g.connect(verb); o.start(t); o.stop(t + 4.2);
+          setTimeout(bell, 2500 + Math.random() * 4500);
+        };
+        setTimeout(bell, 3000);
+        return { stop: () => clearInterval(iv), lp };
+      },
+      rain(out, nodes, alive) {
+        loop('pink', nodes).connect(filt('highpass', 450)).connect(filt('lowpass', 7000)).connect(gain(.55)).connect(out);
+        loop('brown', nodes).connect(filt('lowpass', 260)).connect(gain(.4)).connect(out);
+        const iv = setInterval(() => { if (Math.random() < .55) burst(out, .02 + Math.random() * .03, .02 + Math.random() * .07, 'bandpass', 2000 + Math.random() * 5000, 1.5); }, 55);
+        return { stop: () => clearInterval(iv) };
+      },
+      ocean(out, nodes) {
+        const lp = filt('lowpass', 600, .3), g = gain(.32);
+        loop('brown', nodes).connect(lp).connect(g).connect(out);
+        lfo(.075, .26, g.gain, nodes); lfo(.075, 380, lp.frequency, nodes);
+        const hiss = gain(.035); loop('pink', nodes).connect(filt('highpass', 1600)).connect(hiss).connect(out);
+        lfo(.075, .03, hiss.gain, nodes);
+        return {};
+      },
+      fire(out, nodes, alive) {
+        loop('brown', nodes).connect(filt('lowpass', 380)).connect(gain(.55)).connect(out);
+        loop('pink', nodes).connect(filt('bandpass', 1100, .6)).connect(gain(.05)).connect(out);
+        const crackle = () => {
+          if (!alive()) return;
+          burst(out, .006 + Math.random() * .03, .04 + Math.random() * (Math.random() < .1 ? .5 : .15), 'highpass', 1200 + Math.random() * 2500, .7);
+          setTimeout(crackle, 25 + Math.random() * (Math.random() < .3 ? 600 : 160));
+        };
+        crackle();
+        return {};
+      },
+      brown(out, nodes) {
+        loop('brown', nodes).connect(filt('lowpass', 1100)).connect(gain(.6)).connect(out);
+        return {};
+      },
+    };
+
+    const emit = () => listeners.forEach(fn => fn());
+    return {
+      names: { music: 'calm music', rain: 'rain', ocean: 'ocean', fire: 'fireplace', brown: 'brown noise' },
+      ctx: init,
+      dest: () => (init(), master),
+      isOn: n => !!active[n],
+      anyOn: () => Object.keys(active).length > 0,
+      onChange: fn => listeners.push(fn),
+      start(n) {
+        if (active[n] || !makers[n]) return; init();
+        const out = gain(0), nodes = [], a = { out, nodes, alive: true };
+        out.connect(master); active[n] = a;
+        Object.assign(a, makers[n](out, nodes, () => a.alive));
+        const t = ctx.currentTime; out.gain.setValueAtTime(0, t); out.gain.linearRampToValueAtTime(1, t + 2.5);
+        emit();
+      },
+      stop(n) {
+        const a = active[n]; if (!a) return; delete active[n]; a.alive = false;
+        const t = ctx.currentTime; a.out.gain.cancelScheduledValues(t); a.out.gain.setValueAtTime(a.out.gain.value, t); a.out.gain.linearRampToValueAtTime(0, t + 2);
+        setTimeout(() => { a.stop && a.stop(); a.nodes.forEach(x => { try { x.stop(); } catch {} }); a.out.disconnect(); }, 2200);
+        emit();
+      },
+      toggle(n) { this.isOn(n) ? this.stop(n) : this.start(n); },
+      stopAll() { Object.keys(active).forEach(n => this.stop(n)); },
+      volume(v) { if (v == null) return vol; vol = v; store.set('volume', v); if (master) master.gain.setTargetAtTime(v, ctx.currentTime, .1); },
+      // breath sync: the music opens up as you breathe in (k = 0..1)
+      breath(k) { const m = active.music; if (m && m.lp) m.lp.frequency.setTargetAtTime(650 + k * 1500, ctx.currentTime, .25); },
+    };
+  })();
+
+  /* ---------------- breathing ---------------- */
+  const patterns = {
+    calm:  { name: 'calm', steps: [['breathe in', 4], ['breathe out', 6]], hint: 'In for 4, out for 6. A longer out-breath tells your body it\'s safe. Breathe low into your belly and let your shoulders drop.' },
+    box:   { name: 'box', steps: [['breathe in', 4], ['hold', 4], ['breathe out', 4], ['hold', 4]], hint: 'Four equal sides. Steady and even, good for when your thoughts are racing.' },
+    sigh:  { name: 'sigh', steps: [['breathe in', 2], ['a little more', 1], ['long breath out', 6]], hint: 'Two inhales through the nose, then one long exhale through the mouth. A quick reset when you feel a spike.' },
+    sleep: { name: '4·7·8', steps: [['breathe in', 4], ['hold', 7], ['breathe out', 8]], hint: 'For winding down or lying in bed. If the hold feels like too much, switch to calm.' },
+  };
+  let pat = store.get('pattern', 'calm'); if (!patterns[pat]) pat = 'calm';
+  const orb = $('#orb'), phaseEl = $('#phase'), countEl = $('#count');
+  const MIN = .62, MAX = 1;
+  let breathing = false, raf = 0, t0 = 0, cycles = 0, lastScale = MIN;
+
+  function renderPatterns() {
+    $('#patterns').innerHTML = Object.entries(patterns).map(([k, p]) =>
+      `<button class="pill ${k === pat ? 'on' : ''}" data-p="${k}">${p.name}</button>`).join('');
+    $('#patternHint').textContent = patterns[pat].hint;
+  }
+  $('#patterns').addEventListener('click', e => {
+    const b = e.target.closest('[data-p]'); if (!b) return;
+    pat = b.dataset.p; store.set('pattern', pat); renderPatterns();
+    if (breathing) { t0 = performance.now(); cycles = 0; }
+  });
+  renderPatterns();
+
+  const ease = x => .5 - Math.cos(Math.PI * x) / 2;
+  function frame(now) {
+    const steps = patterns[pat].steps, total = steps.reduce((a, s) => a + s[1], 0);
+    let el = (now - t0) / 1000;
+    cycles = Math.floor(el / total);
+    el %= total;
+    let i = 0; while (el >= steps[i][1]) { el -= steps[i][1]; i++; }
+    const [label, dur] = steps[i], k = ease(el / dur);
+    let scale = lastScale;
+    if (/in|more/.test(label) && !/out/.test(label)) {
+      // inhale: from scale at start of step toward MAX (two-part sigh splits it)
+      const inSteps = steps.filter(s => /in|more/.test(s[0]) && !/out/.test(s[0]));
+      const idx = inSteps.indexOf(steps[i]);
+      const from = MIN + (MAX - MIN) * (idx / inSteps.length), to = MIN + (MAX - MIN) * ((idx + 1) / inSteps.length);
+      scale = from + (to - from) * k;
+    } else if (/out/.test(label)) scale = MAX - (MAX - MIN) * k;
+    else scale = (i > 0 && /out/.test(steps[i - 1][0])) ? MIN : MAX;
+    lastScale = scale;
+    orb.style.transform = `scale(${scale})`;
+    Sound.breath((scale - MIN) / (MAX - MIN));
+    phaseEl.textContent = label;
+    countEl.textContent = Math.ceil(dur - el) + (cycles ? `  ·  ${cycles} breath${cycles > 1 ? 's' : ''}` : '');
+    raf = requestAnimationFrame(frame);
+  }
+  function toggleBreath() {
+    breathing = !breathing;
+    if (breathing) {
+      orb.classList.remove('idle'); t0 = performance.now(); lastScale = MIN; raf = requestAnimationFrame(frame);
+      startBreathSound();
+    } else {
+      cancelAnimationFrame(raf); orb.style.transform = ''; orb.classList.add('idle');
+      stopBreathSound();
+      phaseEl.textContent = cycles ? 'nice. well done.' : 'tap to breathe';
+      countEl.textContent = cycles ? `${cycles} breath${cycles > 1 ? 's' : ''}` : '';
+    }
+  }
+  $('#orbStage').addEventListener('click', toggleBreath);
+
+  // sound that plays while breathing (only stops sounds that breathing itself started)
+  const breathOpts = ['off', 'music', 'rain', 'ocean'];
+  let breathSound = store.get('breathSound', 'music'); if (!breathOpts.includes(breathSound)) breathSound = 'music';
+  let breathOwned = null;
+  function startBreathSound() {
+    if (breathSound === 'off' || Sound.isOn(breathSound)) return;
+    Sound.start(breathSound); breathOwned = breathSound;
+  }
+  function stopBreathSound() { if (breathOwned) { Sound.stop(breathOwned); breathOwned = null; } }
+  function renderBreathSounds() {
+    $('#breathSounds').innerHTML = '<span>sound:</span>' + breathOpts.map(o =>
+      `<button class="pill sm ${o === breathSound ? 'on' : ''}" data-bs="${o}">${o === 'music' ? 'calm music' : o}</button>`).join('');
+  }
+  $('#breathSounds').addEventListener('click', e => {
+    const b = e.target.closest('[data-bs]'); if (!b) return;
+    breathSound = b.dataset.bs; store.set('breathSound', breathSound); renderBreathSounds();
+    if (breathing) { stopBreathSound(); startBreathSound(); }
+  });
+  renderBreathSounds();
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeSheet();
+    if (e.code === 'Space' && current === 'breathe' && !/INPUT|TEXTAREA/.test(document.activeElement.tagName) && !sheetOpen) { e.preventDefault(); toggleBreath(); }
+  });
+
+  /* ---------------- toolkit content ---------------- */
+  const SRC_ANX = '<a href="https://www.cci.health.wa.gov.au/Resources/Looking-After-Yourself/Anxiety" target="_blank">CCI: Anxiety</a>';
+  const SRC_WORRY = '<a href="https://www.cci.health.wa.gov.au/Resources/Looking-After-Yourself/Worry-and-Rumination" target="_blank">CCI: Worry &amp; Rumination</a>';
+  const SRC_PC = '<a href="https://psychcentral.com/anxiety/how-to-train-your-brain-to-alleviate-anxiety" target="_blank">Psych Central: Train your brain</a>';
+
+  const tools = [
+    // ---- right now
+    { g: 'right now', id: 'ground', t: '5 · 4 · 3 · 2 · 1', s: 'Get out of your head and back into the room.',
+      b: `<p class="lede">Anxiety pulls you into "what if." Your senses only work in "what is."</p>
+      <ol><li>Name <b>5</b> things you can see. Small details count, like the color of a sticker.</li>
+      <li><b>4</b> things you can feel: your feet on the floor, your sleeves, the chair.</li>
+      <li><b>3</b> things you can hear, near and far.</li>
+      <li><b>2</b> things you can smell, or two smells you like.</li>
+      <li><b>1</b> slow breath, all the way out.</li></ol>
+      <p>Your mind will wander back to the worry. That's okay. Each time you come back, you're training your attention.</p>
+      <div class="src">Attention training from ${SRC_WORRY}</div>` },
+    { g: 'right now', id: 'wave', t: 'Ride the wave', s: 'Anxiety rises, peaks, and falls if you let it.',
+      b: `<p class="lede">Anxiety feels like it'll keep climbing forever. It won't. Like a wave, it peaks and passes, usually within minutes, as long as you don't fight it or run from it.</p>
+      <ol><li><b>Notice it.</b> "There's anxiety. My chest is tight, my heart is fast."</li>
+      <li><b>Rate it</b> 0–10. Just a number, no judgment.</li>
+      <li><b>Breathe low and slow.</b> Let the out-breath be longer than the in-breath.</li>
+      <li><b>Surf, don't fight.</b> Let the feeling be there. You don't have to make it go away.</li>
+      <li><b>Rate it again</b> in a few minutes. Watch it change.</li></ol>
+      <div class="say">This is uncomfortable, not dangerous. My body is doing its alarm thing. It will pass.</div>
+      <p><button class="btn" data-go="breathe">breathe with the aura</button></p>
+      <div class="src">Anxiety surfing from ${SRC_ANX}</div>` },
+    { g: 'right now', id: 'body', t: 'Quick body reset', s: 'Release the tension your body is holding.',
+      b: `<p class="lede">A short version of progressive muscle relaxation. Tense each area for about 5 seconds, then let go for about 10 and notice the difference.</p>
+      <ol><li><b>Hands:</b> make tight fists, then let them go loose.</li>
+      <li><b>Shoulders:</b> pull them up to your ears, then let them drop.</li>
+      <li><b>Face:</b> scrunch everything, then soften your jaw and forehead.</li>
+      <li><b>Feet:</b> curl your toes, then release.</li></ol>
+      <p>Extra: cold water on your face or wrists, or holding something cold, can slow a racing body fast.</p>
+      <div class="src">Progressive Muscle Relaxation from ${SRC_ANX}</div>` },
+
+    // ---- thoughts
+    { g: 'for my thoughts', id: 'thoughts', t: 'Thoughts are just thoughts', s: 'A thought is not a fact, a prediction, or a sign.',
+      b: `<p class="lede">An anxious brain treats every thought as urgent and true. You can step back and look at it instead of being inside it.</p>
+      <ol><li>Put this in front of the thought: <b>"I'm having the thought that…"</b> (e.g. "I'm having the thought that they're mad at me.")</li>
+      <li>Ask: <b>Is this what actually happened, or how I feel about it?</b></li>
+      <li>Ask: <b>What's the evidence for it? Against it?</b></li>
+      <li>Ask: <b>Is this a thinking trap?</b> Mind reading, fortune telling, catastrophizing, all-or-nothing.</li></ol>
+      <div class="say">Thoughts are just thoughts. I don't have to believe them, argue with them, or act on them.</div>
+      <div class="src">Reality testing from ${SRC_PC} · Unhelpful Thinking Styles from ${SRC_ANX}</div>` },
+    { g: 'for my thoughts', id: 'worrytime', t: 'Worry time', s: 'Postpone the worry. Save it for later.',
+      b: `<p class="lede">Worry feels like it has to be dealt with <i>right now</i>. It doesn't. You can postpone it, and that shows your brain worry is more controllable than it feels.</p>
+      <ol><li><b>Choose a worry time:</b> 15–20 minutes, same time each day, not close to bedtime.</li>
+      <li>When a worry shows up, <b>notice it</b> and <b>jot it in the worry box</b> below.</li>
+      <li>Tell yourself <b>"not now, at worry time,"</b> and gently come back to what you were doing.</li>
+      <li><b>At worry time,</b> read the list. Many won't feel important anymore. For the rest, ask: can I do something about this? If yes, problem-solve it. If no, practice letting it go.</li></ol>
+      <div class="section-title" style="margin-left:0">worry box</div>
+      <form class="row" id="worryForm"><input class="field" id="worryInput" placeholder="park a worry here…" autocomplete="off"><button class="btn">save</button></form>
+      <ul class="worry-list" id="worryList"></ul>
+      <div class="row" id="worryActions"></div>
+      <div class="src">Postpone Your Worry from ${SRC_WORRY}</div>` },
+    { g: 'for my thoughts', id: 'solve', t: 'Solvable or a "what if"?', s: 'Worrying and problem-solving are not the same thing.',
+      b: `<p class="lede">Worry goes in circles. Problem-solving moves forward. First figure out which one you're doing.</p>
+      <p><b>Is this a real, current problem I can act on?</b></p>
+      <p><b>Yes →</b> problem-solve it:</p>
+      <ol><li>Say the problem in one sentence.</li><li>Brainstorm options, even silly ones.</li><li>Pick one that's good enough. It doesn't have to be perfect.</li><li>Break it into a first tiny step and do that step.</li><li>Check how it went later.</li></ol>
+      <p><b>No, it's a "what if" →</b> it's a hypothetical worry. More thinking won't solve it. Try <a href="#" data-open="uncertain">making room for uncertainty</a> or <a href="#" data-go="play">let it drift away</a>.</p>
+      <div class="src">Problem-Solving from ${SRC_WORRY}</div>` },
+    { g: 'for my thoughts', id: 'uncertain', t: 'Making room for uncertainty', s: 'You can live well without being 100% sure.',
+      b: `<p class="lede">Needing certainty keeps worry going. The harder you chase "100% sure," the louder the doubt gets, because full certainty almost never exists.</p>
+      <ul><li><b>Can I actually be certain about this?</b> Usually no, and that's true for everyone.</li>
+      <li><b>What is needing certainty costing me?</b> Time, sleep, energy, being present with people.</li>
+      <li><b>Where do I already accept uncertainty?</b> Crossing the street, the weather, trying new food. You're better at this than you think.</li>
+      <li><b>Practice small doses:</b> send a text without rereading it, order something new, leave a small thing unchecked.</li></ul>
+      <div class="say">Maybe, maybe not. I don't need to know right now to be okay right now.</div>
+      <div class="src">Accepting Uncertainty from ${SRC_WORRY}</div>` },
+    { g: 'for my thoughts', id: 'script', t: 'Rewrite the script', s: 'Swap the anxious story for a kinder, truer one.',
+      b: `<p class="lede">We all have automatic stories we tell ourselves in certain situations. Repeating a new one helps build a new pathway in your brain.</p>
+      <p>A new script has three parts:</p>
+      <ol><li><b>Acknowledge the fear:</b> "I'm nervous about this."</li><li><b>Affirm you can cope:</b> "I've handled hard things before."</li><li><b>Make a plan:</b> "If it gets hard, I'll do X."</li></ol>
+      <p><b>Old:</b> "They didn't text back, they're losing interest."<br><b>New:</b> "I feel anxious that they haven't replied. That's my attachment alarm. People get busy, and I can handle waiting. I'll text a friend or watch something until I hear back."</p>
+      <div class="section-title" style="margin-left:0">write your own</div>
+      <textarea class="field" id="scriptBox" rows="4" style="width:100%;resize:vertical" placeholder="When ___ happens, I usually tell myself ___. Now I'll tell myself…"></textarea>
+      <div class="src">Change the scripts from ${SRC_PC}</div>` },
+
+    // ---- relationships
+    { g: 'relationships', id: 'rocd', t: 'When ROCD spikes', s: '"Do I really love them?" "Are they the one?"',
+      b: `<p class="lede">With relationship OCD, the doubt isn't the problem. The problem is the endless attempts to solve it. The more you check, analyze, and compare, the stronger the doubt gets.</p>
+      <ol><li><b>Name it:</b> "This is ROCD. It's a spike, not a sign."</li>
+      <li><b>Spot the compulsion you want to do:</b> checking your feelings, replaying moments, comparing them to other people or couples, googling, asking someone "is this normal?", confessing.</li>
+      <li><b>Delay it.</b> Wait 15 minutes. Then try another 15. The urge rises and falls on its own.</li>
+      <li><b>Don't argue with the doubt.</b> Agree with the uncertainty instead: "Maybe, maybe not."</li>
+      <li><b>Get back to your life.</b> Do the thing you were doing, or something you care about, while the doubt hangs around in the background.</li></ol>
+      <div class="say">I'm having the thought that I don't love them enough. I don't need to figure this out right now. Maybe, maybe not, and I'm going to keep living my life.</div>
+      <p>Feelings go up and down in every relationship. A moment of "meh" isn't evidence of anything. It's being human.</p>
+      <p style="font-size:13.5px;color:var(--ink-soft)">The most effective treatment for OCD is ERP (exposure and response prevention) with a therapist trained in OCD. If you ever want to try it, the <a href="https://iocdf.org/find-help/" target="_blank">IOCDF directory</a> is a good place to start.</p>
+      <div class="src">Based on CBT/ERP principles and Reducing Reassurance Seeking from ${SRC_ANX}</div>` },
+    { g: 'relationships', id: 'attach', t: 'The attachment alarm', s: 'Waiting on a text, feeling distance, need to fix it now.',
+      b: `<p class="lede">Anxious attachment is like a smoke alarm that's too sensitive. The urgency you feel is the alarm going off. It isn't information about the relationship.</p>
+      <ol><li><b>Fact vs story.</b> Fact: "They haven't replied in 2 hours." Story: "They're pulling away." Write down only the fact.</li>
+      <li><b>Write the text, but don't send it yet.</b> Put it in notes. Come back in 30 minutes. If it still feels right when you're calm, send it.</li>
+      <li><b>Soothe yourself first.</b> Breathe, hand on your chest, wrap up in a blanket, do the ROCD steps if checking kicks in.</li>
+      <li><b>Turn toward your own life.</b> Text a friend, do something with your hands, put on a stream.</li>
+      <li><b>Reach out from calm, not from alarm.</b> Same need, very different message.</li></ol>
+      <div class="say">I'm safe right now. This feeling is old and loud, and it's not the whole truth. I can wait. I can take care of me.</div>
+      <p><button class="btn" data-go="breathe">breathe first</button> <button class="btn ghost" data-go="escape">distract me</button></p>
+      <div class="src">Fact vs story from reality testing in ${SRC_PC} · thought challenging from ${SRC_ANX}</div>` },
+    { g: 'relationships', id: 'reassure', t: 'The reassurance trap', s: 'Why asking "are we okay?" makes it worse.',
+      b: `<p class="lede">Reassurance feels like relief, but it only lasts a moment. Then the doubt comes back, often stronger, and you need more reassurance. Your brain learns that it can't handle uncertainty without help.</p>
+      <p><b>Reassurance can look like:</b> asking "are you mad?" or "do you still like me?", checking when they were last online, rereading old messages, asking friends to analyze texts, googling.</p>
+      <p><b>To cut back gently:</b></p>
+      <ol><li><b>Notice the urge</b> and rate how strong it is, 0–10.</li>
+      <li><b>Delay.</b> Make yourself a deal: wait 10 minutes first. Make the wait longer over time.</li>
+      <li><b>Cut down gradually:</b> ask once instead of three times. Don't try to go to zero overnight.</li>
+      <li><b>Sit with the discomfort.</b> It peaks and fades. Every time you ride it out, it gets easier.</li>
+      <li><b>Give yourself credit.</b> This is hard, and you're doing it.</li></ol>
+      <div class="src">Reducing Reassurance Seeking from ${SRC_ANX}</div>` },
+
+    // ---- work & friends
+    { g: 'work & friends', id: 'shift', t: 'Before & during a shift', s: 'For retail days that feel like a lot.',
+      b: `<p class="lede">Customers, coworkers, being "on" for hours. It makes sense if it takes a lot out of you.</p>
+      <p><b>Before:</b></p>
+      <ul><li>3 rounds of <i>calm</i> breathing in the car, on the bus, or in the break room.</li>
+      <li>Your script: <i>"I don't have to be perfect, just present. If it gets busy, I take it one customer at a time."</i></li></ul>
+      <p><b>During:</b></p>
+      <ul><li>Between customers: one long out-breath, and feel your feet on the floor.</li>
+      <li>Rude customer? <i>"This is about their day, not about me."</i></li>
+      <li>It's okay to step into the back for a minute: run cold water on your wrists, then do 5-4-3-2-1.</li>
+      <li>Made a mistake? Fix what you can, say sorry once, and move on. Everyone else forgets faster than you do.</li></ul>` },
+    { g: 'work & friends', id: 'replay', t: 'The after-shift replay', s: 'When your brain won\'t stop rerunning a moment.',
+      b: `<p class="lede">Replaying an awkward moment over and over is rumination. It feels like you're processing it, but it mostly keeps the bad feeling going.</p>
+      <ol><li><b>Catch it:</b> "I'm replaying again."</li>
+      <li><b>Ask:</b> Is there one thing I can actually do about this? If so, write it down for tomorrow. That's all you need to do.</li>
+      <li><b>Kindness check:</b> If a coworker did exactly what I did, would I judge them this harshly?</li>
+      <li><b>Postpone the rest</b> to <a href="#" data-open="worrytime">worry time</a>.</li>
+      <li><b>Do something absorbing:</b> a game, a stream, cooking, a walk. Something that uses your attention.</li></ol>
+      <div class="src">Rumination strategies from ${SRC_WORRY}</div>` },
+    { g: 'work & friends', id: 'friends', t: 'Friend worries', s: '"Are they annoyed with me?" "Was that weird?"',
+      b: `<p class="lede">Anxiety loves mind reading: deciding what other people think without any real evidence.</p>
+      <ul><li><b>Other explanations:</b> they're busy, tired, distracted, dealing with their own stuff. Most people are thinking about themselves, not about you.</li>
+      <li><b>Try a behavioral experiment:</b>
+        <ol><li>Write down your prediction: "If I text them, they'll be cold."</li>
+        <li>Test it: send a normal, friendly message.</li>
+        <li>See what actually happens, and compare it to your prediction.</li></ol></li>
+      <li><b>Practice challenges:</b> small social steps, like a quick "hey, how's your week?", build confidence over time.</li></ul>
+      <div class="say">I can't read minds. If something's wrong, they can tell me. Until then, I'll assume the kind version.</div>
+      <div class="src">Behavioural Experiments from ${SRC_ANX} · Practice challenges from ${SRC_PC}</div>` },
+
+    // ---- long term
+    { g: 'building calm over time', id: 'brain', t: 'Training your brain', s: 'Your brain can change. Small repetitions add up.',
+      b: `<p class="lede">Your brain can rewire itself (that's neuroplasticity). Anxious pathways got strong through repetition, and calm pathways get strong the same way. It takes weeks or months, not days, so be patient with yourself.</p>
+      <ul><li><b>A little calm every day:</b> even 2–5 minutes of breathing or meditation. Kindness and compassion meditations are especially helpful.</li>
+      <li><b>Move your body:</b> regular aerobic exercise like walks, dancing, or cycling is linked to real changes in the brain.</li>
+      <li><b>Learn something new:</b> an instrument, drawing, a language, puzzles. It's both self-care and brain training.</li>
+      <li><b>Small brave steps:</b> do something slightly scary, then a little more next time.</li>
+      <li><b>New scripts:</b> repeat your <a href="#" data-open="script">rewritten script</a> until it feels automatic.</li></ul>
+      <p>Start with just one. Consistency matters more than intensity.</p>
+      <div class="src">${SRC_PC}</div>` },
+    { g: 'building calm over time', id: 'learn', t: 'Learn more', s: 'The full guides and workbooks behind this app.',
+      b: `<p class="lede">Free, evidence-based workbooks. They're worth working through slowly, one module at a time.</p>
+      <ul><li>${SRC_ANX}: understanding anxiety, breathing retraining, thought diaries, facing fears, reducing reassurance seeking.</li>
+      <li>${SRC_WORRY}: the "What? Me Worry?" workbook, worry postponement, mindfulness and letting go, accepting uncertainty.</li>
+      <li>${SRC_PC}: six ways to retrain an anxious brain.</li>
+      <li><a href="https://iocdf.org/about-ocd/" target="_blank">IOCDF: About OCD</a>: OCD, including relationship-themed OCD, and finding an ERP therapist.</li>
+      <li><a href="https://www.cci.health.wa.gov.au/Resources/Looking-After-Yourself/Panic" target="_blank">CCI: Panic</a>: if anxiety turns into panic attacks.</li></ul>
+      <p>If you're in crisis: call or text <b>988</b> (US), or go to <a href="https://findahelpline.com" target="_blank">findahelpline.com</a>.</p>` },
+  ];
+
+  function renderToolkit() {
+    const groups = [...new Set(tools.map(t => t.g))];
+    $('#toolkit').innerHTML = groups.map(g =>
+      `<div class="section-title">${g}</div>` +
+      tools.filter(t => t.g === g).map(t => `<button class="card" data-open="${t.id}"><div class="t">${t.t}</div><div class="s">${t.s}</div></button>`).join('')
+    ).join('');
+  }
+  renderToolkit();
+
+  const chips = [['relationship doubt', 'rocd'], ['waiting on a text', 'attach'], ['wanting reassurance', 'reassure'], ['work stress', 'shift'],
+    ['replaying something', 'replay'], ['friend stuff', 'friends'], ["can't stop worrying", 'worrytime'], ['feeling panicky', 'wave'], ['need to ground', 'ground']];
+  $('#chips').innerHTML = chips.map(([l, id]) => `<button class="pill" data-open="${id}">${l}</button>`).join('');
+
+  /* ---------------- sheet ---------------- */
+  let sheetOpen = false;
+  function openSheet(id) {
+    const t = tools.find(x => x.id === id); if (!t) return;
+    $('#sheetBody').innerHTML = `<h2>${t.t}</h2>` + t.b;
+    $('#sheet').scrollTop = 0;
+    $('#sheet').classList.add('open'); $('#sheetBack').classList.add('open'); sheetOpen = true;
+    if (id === 'worrytime') wireWorry();
+    if (id === 'script') { const s = $('#scriptBox'); s.value = store.get('script', ''); s.oninput = () => store.set('script', s.value); }
+  }
+  function closeSheet() { $('#sheet').classList.remove('open'); $('#sheetBack').classList.remove('open'); sheetOpen = false; }
+  $('#sheetClose').onclick = closeSheet; $('#sheetBack').onclick = closeSheet;
+
+  document.addEventListener('click', e => {
+    const o = e.target.closest('[data-open]'); if (o) { e.preventDefault(); openSheet(o.dataset.open); return; }
+    const g = e.target.closest('[data-go]'); if (g) { e.preventDefault(); closeSheet(); show(g.dataset.go); if (g.dataset.go === 'breathe' && !breathing) toggleBreath(); }
+  });
+
+  /* ---------------- worry box ---------------- */
+  let worryTimer = 0;
+  function wireWorry() {
+    const list = $('#worryList'), actions = $('#worryActions');
+    const render = () => {
+      const w = store.get('worries', []);
+      list.innerHTML = w.map((x, i) => `<li><span>${esc(x)}</span><button data-del="${i}" aria-label="remove">×</button></li>`).join('') ||
+        '<li style="opacity:.7">empty. nothing parked right now.</li>';
+      actions.innerHTML = w.length ? `<button class="btn" id="startWT" type="button">start 15-min worry time</button><button class="btn ghost" id="clearW" type="button">let them all go</button>` : '';
+      const s = $('#startWT'); if (s) s.onclick = startWorryTime;
+      const c = $('#clearW'); if (c) c.onclick = () => { store.set('worries', []); render(); };
+    };
+    $('#worryForm').onsubmit = e => {
+      e.preventDefault(); const v = $('#worryInput').value.trim(); if (!v) return;
+      const w = store.get('worries', []); w.push(v); store.set('worries', w); $('#worryInput').value = ''; render();
+    };
+    list.onclick = e => { const d = e.target.closest('[data-del]'); if (!d) return; const w = store.get('worries', []); w.splice(+d.dataset.del, 1); store.set('worries', w); render(); };
+    render();
+  }
+  function startWorryTime() {
+    clearInterval(worryTimer);
+    const a = $('#worryActions'); let left = 15 * 60;
+    a.innerHTML = '<div style="width:100%"><div class="timer" id="wt">15:00</div><p class="hint" style="margin:0 auto">Go through each worry. Solvable → write a first step. Not solvable → "maybe, maybe not," then cross it off.</p></div>';
+    worryTimer = setInterval(() => {
+      left--; const el = $('#wt'); if (!el) return clearInterval(worryTimer);
+      el.textContent = `${String(left / 60 | 0).padStart(2, '0')}:${String(left % 60).padStart(2, '0')}`;
+      if (left <= 0) { clearInterval(worryTimer); el.textContent = "time's up. go do something kind for yourself."; }
+    }, 1000);
+  }
+  const esc = s => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  /* ---------------- play: drift pond ---------------- */
+  const cv = $('#pond'), ctx = cv.getContext('2d');
+  let W = 0, H = 0, dpr = 1, bubbles = [], rings = [], pondRaf = 0, lastT = 0, spawnAcc = 0;
+  let released = store.get('released', 0);
+  let soundOn = store.get('sound', true);
+  const updateLetGo = () => $('#letGo').textContent = released ? `${released} thought${released > 1 ? 's' : ''} let go` : 'tap the bubbles · let thoughts drift away';
+  const updateSound = () => $('#soundBtn').textContent = soundOn ? 'sound on' : 'sound off';
+  updateLetGo(); updateSound();
+  $('#soundBtn').onclick = () => { soundOn = !soundOn; store.set('sound', soundOn); updateSound(); };
+
+  function resize() {
+    dpr = window.devicePixelRatio || 1; W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', () => { if (current === 'play') resize(); });
+
+  function spawn(text) {
+    const r = text ? Math.min(90, 46 + text.length * 1.1) : 18 + Math.random() * 34;
+    bubbles.push({
+      x: text ? W / 2 : r + Math.random() * (W - 2 * r), y: text ? H - 150 : H + r,
+      r, vy: text ? -(14 + Math.random() * 6) : -(10 + Math.random() * 22), ph: Math.random() * 6.28,
+      sway: 10 + Math.random() * 20, text, a: text ? 0 : 1, life: 0, hue: Math.random()
+    });
+  }
+  function drawBubble(b) {
+    const x = b.x + Math.sin(b.ph) * b.sway * .3;
+    const g = ctx.createRadialGradient(x, b.y, 0, x, b.y, b.r);
+    g.addColorStop(0, 'rgba(207,77,190,.95)'); g.addColorStop(.32, 'rgba(243,174,71,.9)');
+    g.addColorStop(.62, 'rgba(127,245,236,.75)'); g.addColorStop(1, 'rgba(127,245,236,0)');
+    ctx.globalAlpha = b.a; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, b.y, b.r, 0, 6.283); ctx.fill();
+    if (b.text) {
+      ctx.fillStyle = '#fff'; ctx.font = '600 13px ui-rounded, -apple-system, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(120,20,110,.6)'; ctx.shadowBlur = 8;
+      wrap(b.text, b.r * 1.4).forEach((ln, i, arr) => ctx.fillText(ln, x, b.y + (i - (arr.length - 1) / 2) * 16));
+      ctx.shadowBlur = 0;
+    }
+    ctx.globalAlpha = 1; b.drawX = x;
+  }
+  function wrap(t, maxW) {
+    const words = t.split(' '), lines = []; let cur = '';
+    for (const w of words) { const test = cur ? cur + ' ' + w : w; if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; } else cur = test; }
+    if (cur) lines.push(cur); return lines.slice(0, 4);
+  }
+  function pondFrame(t) {
+    const dt = Math.min(.05, (t - lastT) / 1000 || 0); lastT = t;
+    ctx.clearRect(0, 0, W, H);
+    spawnAcc += dt; if (spawnAcc > 1.1 && bubbles.filter(b => !b.text).length < 16) { spawnAcc = 0; spawn(); }
+    for (const b of bubbles) {
+      b.y += b.vy * dt; b.ph += dt * .8; b.life += dt;
+      if (b.text) { b.a = Math.min(1, b.life / 1.2); if (b.y < H * .35) b.a = Math.max(0, (b.y - H * .05) / (H * .3)); b.r *= (1 + dt * .02); }
+      drawBubble(b);
+    }
+    bubbles = bubbles.filter(b => b.y + b.r > -10 && b.a > .01 || (b.text && b.life < 2));
+    for (const r of rings) {
+      r.t += dt; const k = r.t / 1.4;
+      ctx.strokeStyle = `rgba(255,255,255,${.6 * (1 - k)})`; ctx.lineWidth = 2;
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(r.x, r.y, r.r + k * (40 + i * 26), 0, 6.283); ctx.stroke(); }
+      for (const p of r.p) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 20 * dt;
+        ctx.fillStyle = `rgba(${p.c},${1 - k})`; ctx.beginPath(); ctx.arc(p.x, p.y, 2.5 * (1 - k) + .5, 0, 6.283); ctx.fill(); }
+    }
+    rings = rings.filter(r => r.t < 1.4);
+    pondRaf = requestAnimationFrame(pondFrame);
+  }
+  function startPond() { if (pondRaf) return; resize(); if (!bubbles.length) for (let i = 0; i < 8; i++) { spawn(); bubbles[bubbles.length - 1].y = Math.random() * H; } lastT = performance.now(); pondRaf = requestAnimationFrame(pondFrame); }
+  function stopPond() { cancelAnimationFrame(pondRaf); pondRaf = 0; }
+
+  const notes = [392, 440, 523.25, 587.33, 659.25, 783.99, 880];
+  function chime(size) {
+    if (!soundOn) return;
+    try {
+      const actx = Sound.ctx(), dest = Sound.dest();
+      const f = notes[Math.max(0, Math.min(notes.length - 1, Math.round(6 - size / 15)))];
+      const now = actx.currentTime;
+      [[f, .07], [f * 2, .018], [f * 1.5, .012]].forEach(([fr, gv]) => {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = 'sine'; o.frequency.value = fr; g.gain.setValueAtTime(0, now);
+        g.gain.linearRampToValueAtTime(gv, now + .015); g.gain.exponentialRampToValueAtTime(.0001, now + 2.2);
+        o.connect(g).connect(dest); o.start(now); o.stop(now + 2.3);
+      });
+    } catch {}
+  }
+  cv.addEventListener('pointerdown', e => {
+    const rect = cv.getBoundingClientRect(), x = e.clientX - rect.left, y = e.clientY - rect.top;
+    for (let i = bubbles.length - 1; i >= 0; i--) {
+      const b = bubbles[i];
+      if (Math.hypot(x - b.drawX, y - b.y) < b.r * .85) {
+        const cols = ['207,77,190', '243,174,71', '127,245,236', '255,255,255'];
+        rings.push({ x: b.drawX, y: b.y, r: b.r * .4, t: 0, p: Array.from({ length: 14 }, () => { const a = Math.random() * 6.283, s = 30 + Math.random() * 70; return { x: b.drawX, y: b.y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, c: cols[Math.random() * 4 | 0] }; }) });
+        bubbles.splice(i, 1); chime(b.r); return;
+      }
+    }
+    rings.push({ x, y, r: 4, t: .5, p: [] });
+  });
+  $('#floatForm').addEventListener('submit', e => {
+    e.preventDefault(); const v = $('#floatInput').value.trim(); if (!v) return;
+    $('#floatInput').value = ''; $('#floatInput').blur(); spawn(v); released++; store.set('released', released); updateLetGo(); chime(20);
+  });
+
+  /* ---------------- escape ---------------- */
+  const picks = [
+    ['lofi beats', 'https://www.youtube.com/results?search_query=lofi+hip+hop+radio+live'],
+    ['cozy gaming', 'https://www.youtube.com/results?search_query=cozy+games+no+commentary'],
+    ['Bob Ross', 'https://www.youtube.com/results?search_query=bob+ross+joy+of+painting'],
+    ['art streams', 'https://www.twitch.tv/directory/category/art'],
+    ['music streams', 'https://www.twitch.tv/directory/category/music'],
+    ['just chatting', 'https://www.twitch.tv/directory/category/just-chatting'],
+    ['ASMR', 'https://www.twitch.tv/directory/category/asmr'],
+  ];
+  $('#picks').innerHTML = picks.map(([n, u]) => `<a class="pill" href="${u}" target="_blank">${n}</a>`).join('');
+
+  // in-app sound tiles
+  function renderTiles() {
+    $('#tiles').innerHTML = Object.entries(Sound.names).map(([k, n]) =>
+      `<button class="tile ${Sound.isOn(k) ? 'on' : ''}" data-snd="${k}"><div class="dot"></div>${n}</button>`).join('');
+    $('#stopAll').style.visibility = Sound.anyOn() ? 'visible' : 'hidden';
+  }
+  $('#tiles').addEventListener('click', e => {
+    const t = e.target.closest('[data-snd]'); if (!t) return;
+    if (t.dataset.snd === breathOwned) breathOwned = null; // you took it over manually
+    Sound.toggle(t.dataset.snd);
+  });
+  $('#stopAll').onclick = () => { breathOwned = null; Sound.stopAll(); };
+  const volEl = $('#vol'); volEl.value = Sound.volume(); volEl.oninput = () => Sound.volume(+volEl.value);
+  Sound.onChange(renderTiles); renderTiles();
+
+  function renderFavs() {
+    const f = store.get('favs', []);
+    $('#favList').innerHTML = f.map((x, i) => `<a class="card" href="${esc(x.url)}" target="_blank"><span class="t">${esc(x.name)}</span><button class="x" data-fdel="${i}" aria-label="remove">×</button></a>`).join('') ||
+      '<p class="footnote" style="padding-top:0">Add your comfort streamers or channels so they\'re one click away.</p>';
+  }
+  $('#favList').addEventListener('click', e => {
+    const d = e.target.closest('[data-fdel]'); if (!d) return; e.preventDefault(); e.stopPropagation();
+    const f = store.get('favs', []); f.splice(+d.dataset.fdel, 1); store.set('favs', f); renderFavs();
+  });
+  $('#favForm').addEventListener('submit', e => {
+    e.preventDefault(); let url = $('#favUrl').value.trim(), name = $('#favName').value.trim(); if (!url) return;
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    if (!name) { try { name = new URL(url).pathname.replace(/\//g, ' ').trim() || new URL(url).hostname; } catch { name = url; } }
+    const f = store.get('favs', []); f.push({ name, url }); store.set('favs', f);
+    $('#favName').value = ''; $('#favUrl').value = ''; renderFavs();
+  });
+  renderFavs();
+
+  // external links → default browser when inside the Mac app
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href^="http"]'); if (!a || e.defaultPrevented) return;
+    if (native({ type: 'openURL', url: a.href })) e.preventDefault();
+  });
+
+  // native app can ask us to jump somewhere
+  window.calmiiGo = v => { closeSheet(); show(v); if (v === 'breathe' && !breathing) toggleBreath(); };
+
+  const startTab = params.get('tab') || 'breathe';
+  show(['breathe', 'calm', 'play', 'escape'].includes(startTab) ? startTab : 'breathe');
+})();
+</script>
+</body>
+</html>
